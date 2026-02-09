@@ -29,7 +29,10 @@ td{width:140px;height:90px;border:2px solid #444;cursor:pointer;padding:6px;}
 td.checked{background:#8e44ad;text-decoration:line-through;}
 #win{display:none;font-size:28px;color:#f39c12;margin:10px;}
 .panel{margin:12px auto;padding:12px;border:1px solid #333;border-radius:6px;width:85%;}
-input{padding:6px;border-radius:6px;border:none;width:220px;font-size:14px;}
+input{padding:6px;border-radius:6px;border:none;width:220px;font-size:14px;margin-bottom:4px;}
+.task-item{display:flex;justify-content:space-between;align-items:center;margin:4px 0;}
+.task-item input{width:70%;margin-right:4px;font-size:14px;padding:4px;border-radius:4px;border:none;}
+.task-item button{padding:4px 8px;font-size:12px;border-radius:6px;background:#c0392b;}
 </style>
 </head>
 <body>
@@ -55,10 +58,13 @@ input{padding:6px;border-radius:6px;border:none;width:220px;font-size:14px;}
     <input id="adminPin" type="password" placeholder="PIN admina">
     <button id="btnAdminLogin" type="button">Zaloguj</button>
     <div id="adminPanel" style="display:none;margin-top:12px">
-      <input id="taskIn" placeholder="Dodaj zadanie">
-      <button id="btnAddTask" type="button">Dodaj</button>
-      <button id="btnClearTasks" type="button">Wyczyść zadania</button>
+      <div>
+        <input id="taskIn" placeholder="Dodaj nowe zadanie">
+        <button id="btnAddTask" type="button">Dodaj</button>
+        <button id="btnClearTasks" type="button">Wyczyść wszystkie</button>
+      </div>
       <p id="taskCount"></p>
+      <div id="taskList" style="margin-top:12px;text-align:left;"></div>
     </div>
   </div>
 </div>
@@ -67,7 +73,16 @@ input{padding:6px;border-radius:6px;border:none;width:220px;font-size:14px;}
 const ADMIN_PIN = "1413";
 let isAdmin = false;
 let cells = [];
-let tasks = []; // lista zadań lokalnie
+
+// Początkowe 30 zadań
+let tasks = [
+  "Zadanie 1","Zadanie 2","Zadanie 3","Zadanie 4","Zadanie 5",
+  "Zadanie 6","Zadanie 7","Zadanie 8","Zadanie 9","Zadanie 10",
+  "Zadanie 11","Zadanie 12","Zadanie 13","Zadanie 14","Zadanie 15",
+  "Zadanie 16","Zadanie 17","Zadanie 18","Zadanie 19","Zadanie 20",
+  "Zadanie 21","Zadanie 22","Zadanie 23","Zadanie 24","Zadanie 25",
+  "Zadanie 26","Zadanie 27","Zadanie 28","Zadanie 29","Zadanie 30"
+];
 
 // ---------- OBSŁUGA ZDARZEŃ ----------
 document.getElementById("tabBingo").addEventListener("click", ()=>switchTab('bingo'));
@@ -89,8 +104,7 @@ function switchTab(name){
 // ---------- BINGO ----------
 function loadTasks(){
   if(tasks.length < 25){ 
-    document.getElementById("bingo").innerHTML="";
-    alert("Admin musi dodać min. 25 zadań"); 
+    document.getElementById("bingo").innerHTML="Admin musi dodać min. 25 zadań"; 
     return; 
   }
   bingoBoard(tasks);
@@ -136,7 +150,7 @@ function loginAdmin(){
   if(pin===ADMIN_PIN){
     isAdmin=true;
     document.getElementById("adminPanel").style.display="block";
-    updateTaskCount();
+    updateTaskList();
   } else {
     alert("Zły PIN!");
     document.getElementById("adminPanel").style.display="none";
@@ -149,19 +163,40 @@ function addTask(){
   if(!txt) return;
   tasks.push(txt);
   document.getElementById("taskIn").value="";
-  updateTaskCount();
+  updateTaskList();
 }
 
 function clearAllTasks(){
   if(!isAdmin) return;
   if(confirm("Usunąć wszystkie zadania?")){
     tasks = [];
+    updateTaskList();
   }
-  updateTaskCount();
 }
 
-function updateTaskCount(){
+function updateTaskList(){
   document.getElementById("taskCount").textContent="Liczba zadań: "+tasks.length;
+  const listDiv = document.getElementById("taskList");
+  listDiv.innerHTML="";
+  tasks.forEach((t,i)=>{
+    const div = document.createElement("div");
+    div.className="task-item";
+    const input = document.createElement("input");
+    input.value=t;
+    input.addEventListener("change", ()=> {
+      tasks[i]=input.value;
+      updateTaskList();
+    });
+    const btnDel = document.createElement("button");
+    btnDel.textContent="Usuń";
+    btnDel.addEventListener("click", ()=>{
+      tasks.splice(i,1);
+      updateTaskList();
+    });
+    div.appendChild(input);
+    div.appendChild(btnDel);
+    listDiv.appendChild(div);
+  });
 }
 </script>
 </body>
