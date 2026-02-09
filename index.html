@@ -61,6 +61,7 @@ li{background:#222;margin:6px;padding:8px;}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
+try {
   // 🔹 Firebase config – podmień na swoje!
   const firebaseConfig = {
     apiKey: "TU_API_KEY",
@@ -72,143 +73,151 @@ li{background:#222;margin:6px;padding:8px;}
     appId: "TU_APP_ID"
   };
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+  var db = firebase.database();
+} catch(e) {
+  console.warn("Firebase nie został poprawnie skonfigurowany.", e);
+  // Pusty obiekt DB dla testów lokalnych
+  var db = { ref: ()=>({ on:()=>{}, once:()=>({ val:()=>({}) }), set:()=>{}, push:()=>({ key:"test" }), transaction:()=>{} }) };
+}
 
-  const ADMIN_PIN = "1413";
-  let isAdmin = false;
-  let cells = [];
+const ADMIN_PIN = "1413";
+let isAdmin = false;
+let cells = [];
 
-  // ---------- OBSŁUGA ZDARZEŃ ----------
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("tabBingo").addEventListener("click", ()=>switchTab('bingo'));
-    document.getElementById("tabAdmin").addEventListener("click", ()=>switchTab('admin'));
-    document.getElementById("tabRanking").addEventListener("click", ()=>switchTab('ranking'));
+// ---------- OBSŁUGA ZDARZEŃ ----------
+document.getElementById("tabBingo").addEventListener("click", ()=>switchTab('bingo'));
+document.getElementById("tabAdmin").addEventListener("click", ()=>switchTab('admin'));
+document.getElementById("tabRanking").addEventListener("click", ()=>switchTab('ranking'));
+document.getElementById("btnStart").addEventListener("click", startGame);
+document.getElementById("btnAdminLogin").addEventListener("click", loginAdmin);
+document.getElementById("btnAddTask").addEventListener("click", addTask);
+document.getElementById("btnClearTasks").addEventListener("click", clearAllTasks);
 
-    document.getElementById("btnStart").addEventListener("click", startGame);
-    document.getElementById("btnAdminLogin").addEventListener("click", loginAdmin);
-    document.getElementById("btnAddTask").addEventListener("click", addTask);
-    document.getElementById("btnClearTasks").addEventListener("click", clearAllTasks);
-
-    // Live update
-    db.ref('tasks').on('value', snapshot => {
-      if(cells.length>0) loadTasks();
-      updateTaskCount();
-    });
-    db.ref('ranking').on('value', snapshot => {
-      renderRanking();
-    });
+// Live update
+try {
+  db.ref('tasks').on('value', snapshot => {
+    if(cells.length>0) loadTasks();
+    updateTaskCount();
   });
+  db.ref('ranking').on('value', snapshot => {
+    renderRanking();
+  });
+} catch(e){ console.warn(e); }
 
-  // ---------- SWITCH TAB ----------
-  function switchTab(name){
-    document.querySelectorAll('.section').forEach(s=>s.style.display='none');
-    document.getElementById(name+'Tab').style.display='block';
-    document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
-    if(name==='bingo') document.getElementById("tabBingo").classList.add("active");
-    if(name==='admin') document.getElementById("tabAdmin").classList.add("active");
-    if(name==='ranking') {
-      document.getElementById("tabRanking").classList.add("active");
-      renderRanking();
+// ---------- SWITCH TAB ----------
+function switchTab(name){
+  document.querySelectorAll('.section').forEach(s=>s.style.display='none');
+  document.getElementById(name+'Tab').style.display='block';
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  document.getElementById("tab"+name.charAt(0).toUpperCase()+name.slice(1)).classList.add("active");
+}
+
+// ---------- BINGO ----------
+function startGame(){
+  const nick = document.getElementById("nick").value.trim();
+  if(!nick){ alert("Podaj nick!"); return; }
+  window.currentNick = nick;
+  loadTasks();
+}
+
+function loadTasks(){
+  db.ref('tasks').once('value', snap=>{
+    const tasks = snap.val() || {};
+    const arr = Object.values(tasks);
+    if(arr.length < 25){ alert("Admin musi dodać min. 25 zadań"); return; }
+    bingoBoard(arr);
+  });
+}
+
+function bingoBoard(tasks){
+  shuffle(tasks);
+  const picked = tasks.slice(0,25);
+  cells = [];
+  document.getElementById("win").style.display="none";
+  const table = document.getElementById("bingo");
+  table.innerHTML = "";
+  let idx=0;
+  for(let r=0;r<5;r++){
+    let tr = document.createElement("tr");
+    for(let c=0;c<5;c++){
+      let td = document.createElement("td");
+      td.textContent = picked[idx++];
+      td.addEventListener("click", ()=>{
+        td.classList.toggle("checked");
+        checkWin();
+      });
+      cells.push(td);
+      tr.appendChild(td);
     }
+    table.appendChild(tr);
   }
+}
 
-  // ---------- BINGO ----------
-  function startGame(){
-    const nick = document.getElementById("nick").value.trim();
-    if(!nick){ alert("Podaj nick!"); return; }
-    window.currentNick = nick;
-    loadTasks();
+function checkWin(){
+  let wins=0;
+  for(let r=0;r<5;r++) if([0,1,2,3,4].every(c=>cells[r*5+c].classList.contains("checked"))) wins++;
+  for(let c=0;c<5;c++) if([0,1,2,3,4].every(r=>cells[r*5+c].classList.contains("checked"))) wins++;
+  if([0,6,12,18,24].every(i=>cells[i].classList.contains("checked"))) wins++;
+  if([4,8,12,16,20].every(i=>cells[i].classList.contains("checked"))) wins++;
+  if(wins>=3){
+    document.getElementById("win").style.display="block";
+    addWin();
   }
+}
 
-  function loadTasks(){
-    db.ref('tasks').once('value', snap=>{
-      const tasks = snap.val() || {};
-      const arr = Object.values(tasks);
-      if(arr.length < 25){ alert("Admin musi dodać min. 25 zadań"); return; }
-      bingoBoard(arr);
-    });
-  }
-
-  function bingoBoard(tasks){
-    shuffle(tasks);
-    const picked = tasks.slice(0,25);
-    cells = [];
-    document.getElementById("win").style.display="none";
-    const table = document.getElementById("bingo");
-    table.innerHTML = "";
-    let idx=0;
-    for(let r=0;r<5;r++){
-      let tr = document.createElement("tr");
-      for(let c=0;c<5;c++){
-        let td = document.createElement("td");
-        td.textContent = picked[idx++];
-        td.addEventListener("click", ()=>{
-          td.classList.toggle("checked");
-          checkWin();
-        });
-        cells.push(td);
-        tr.appendChild(td);
-      }
-      table.appendChild(tr);
-    }
-  }
-
-  function checkWin(){
-    let wins=0;
-    for(let r=0;r<5;r++) if([0,1,2,3,4].every(c=>cells[r*5+c].classList.contains("checked"))) wins++;
-    for(let c=0;c<5;c++) if([0,1,2,3,4].every(r=>cells[r*5+c].classList.contains("checked"))) wins++;
-    if([0,6,12,18,24].every(i=>cells[i].classList.contains("checked"))) wins++;
-    if([4,8,12,16,20].every(i=>cells[i].classList.contains("checked"))) wins++;
-    if(wins>=3){
-      document.getElementById("win").style.display="block";
-      addWin();
-    }
-  }
-
-  function addWin(){
+function addWin(){
+  try {
     const ref = db.ref('ranking/'+window.currentNick);
     ref.transaction(score => (score||0)+1);
-  }
+  } catch(e){ console.warn(e); }
+}
 
-  function shuffle(a){ a.sort(()=>Math.random()-0.5); }
+function shuffle(a){ a.sort(()=>Math.random()-0.5); }
 
-  // ---------- ADMIN ----------
-  function loginAdmin(){
-    const pin = document.getElementById("adminPin").value.trim();
-    if(pin===ADMIN_PIN){
-      isAdmin=true;
-      document.getElementById("adminPanel").style.display="block";
-      updateTaskCount();
-    } else alert("Zły PIN!");
-  }
+// ---------- ADMIN ----------
+function loginAdmin(){
+  const pin = document.getElementById("adminPin").value.trim();
+  if(pin===ADMIN_PIN){
+    isAdmin=true;
+    document.getElementById("adminPanel").style.display="block";
+    updateTaskCount();
+  } else alert("Zły PIN!");
+}
 
-  function addTask(){
-    if(!isAdmin) return;
-    const txt = document.getElementById("taskIn").value.trim();
-    if(!txt) return;
+function addTask(){
+  if(!isAdmin) return;
+  const txt = document.getElementById("taskIn").value.trim();
+  if(!txt) return;
+  try {
     const newKey = db.ref().child('tasks').push().key;
     db.ref('tasks/'+newKey).set(txt);
-    document.getElementById("taskIn").value="";
-    updateTaskCount();
-  }
+  } catch(e){ console.warn(e); }
+  document.getElementById("taskIn").value="";
+  updateTaskCount();
+}
 
-  function clearAllTasks(){
-    if(!isAdmin) return;
-    if(confirm("Usunąć wszystkie zadania?")) db.ref('tasks').remove();
-    updateTaskCount();
+function clearAllTasks(){
+  if(!isAdmin) return;
+  if(confirm("Usunąć wszystkie zadania?")){
+    try { db.ref('tasks').remove(); } catch(e){ console.warn(e); }
   }
+  updateTaskCount();
+}
 
-  function updateTaskCount(){
+function updateTaskCount(){
+  try {
     db.ref('tasks').once('value', snap=>{
       const count = snap.exists()?Object.keys(snap.val()).length:0;
       document.getElementById("taskCount").textContent="Liczba zadań: "+count;
     });
-  }
+  } catch(e){ console.warn(e); }
+}
 
-  // ---------- RANKING ----------
-  function renderRanking(){
-    const list = document.getElementById("rankList");
-    list.innerHTML="";
+// ---------- RANKING ----------
+function renderRanking(){
+  const list = document.getElementById("rankList");
+  list.innerHTML="";
+  try {
     db.ref('ranking').once('value', snap=>{
       const data = snap.val()||{};
       const entries = Object.entries(data).sort((a,b)=>b[1]-a[1]);
@@ -219,7 +228,8 @@ li{background:#222;margin:6px;padding:8px;}
         list.appendChild(li);
       });
     });
-  }
+  } catch(e){ console.warn(e); list.innerHTML="<li>Brak wyników</li>"; }
+}
 </script>
 </body>
 </html>
