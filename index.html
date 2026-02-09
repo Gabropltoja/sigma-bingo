@@ -30,7 +30,6 @@ li{background:#222;margin:6px;padding:8px;}
 
 <div id="bingoTab" class="tab section">
   <div class="panel">
-    <input id="nick" placeholder="Twój nick">
     <button id="btnStart" type="button">Start</button>
     <div id="win">🏆 WYGRANA – 3 LINIE 🏆</div>
     <table id="bingo"></table>
@@ -62,7 +61,6 @@ li{background:#222;margin:6px;padding:8px;}
 
 <script>
 try {
-  // 🔹 Firebase config – podmień na swoje!
   const firebaseConfig = {
     apiKey: "TU_API_KEY",
     authDomain: "TU_AUTH_DOMAIN",
@@ -76,8 +74,7 @@ try {
   var db = firebase.database();
 } catch(e) {
   console.warn("Firebase nie został poprawnie skonfigurowany.", e);
-  // Pusty obiekt DB dla testów lokalnych
-  var db = { ref: ()=>({ on:()=>{}, once:()=>({ val:()=>({}) }), set:()=>{}, push:()=>({ key:"test" }), transaction:()=>{} }) };
+  var db = { ref: ()=>({ on:()=>{}, once:()=>({ val:()=>({}) }), set:()=>{}, push:()=>({ key:"test" }), remove:()=>{}, transaction:()=>{} }) };
 }
 
 const ADMIN_PIN = "1413";
@@ -93,7 +90,6 @@ document.getElementById("btnAdminLogin").addEventListener("click", loginAdmin);
 document.getElementById("btnAddTask").addEventListener("click", addTask);
 document.getElementById("btnClearTasks").addEventListener("click", clearAllTasks);
 
-// Live update
 try {
   db.ref('tasks').on('value', snapshot => {
     if(cells.length>0) loadTasks();
@@ -114,9 +110,6 @@ function switchTab(name){
 
 // ---------- BINGO ----------
 function startGame(){
-  const nick = document.getElementById("nick").value.trim();
-  if(!nick){ alert("Podaj nick!"); return; }
-  window.currentNick = nick;
   loadTasks();
 }
 
@@ -161,15 +154,7 @@ function checkWin(){
   if([4,8,12,16,20].every(i=>cells[i].classList.contains("checked"))) wins++;
   if(wins>=3){
     document.getElementById("win").style.display="block";
-    addWin();
   }
-}
-
-function addWin(){
-  try {
-    const ref = db.ref('ranking/'+window.currentNick);
-    ref.transaction(score => (score||0)+1);
-  } catch(e){ console.warn(e); }
 }
 
 function shuffle(a){ a.sort(()=>Math.random()-0.5); }
@@ -181,7 +166,10 @@ function loginAdmin(){
     isAdmin=true;
     document.getElementById("adminPanel").style.display="block";
     updateTaskCount();
-  } else alert("Zły PIN!");
+  } else {
+    alert("Zły PIN!");
+    document.getElementById("adminPanel").style.display="none";
+  }
 }
 
 function addTask(){
