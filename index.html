@@ -31,7 +31,7 @@ li{background:#222;margin:6px;padding:8px;}
 <div id="bingoTab" class="tab section">
   <div class="panel">
     <input id="nick" placeholder="Twój nick">
-    <button id="btnStart">Start</button>
+    <button id="btnStart" type="button">Start</button>
     <div id="win">🏆 WYGRANA – 3 LINIE 🏆</div>
     <table id="bingo"></table>
   </div>
@@ -40,11 +40,11 @@ li{background:#222;margin:6px;padding:8px;}
 <div id="adminTab" class="tab section" style="display:none">
   <div class="panel">
     <input id="adminPin" type="password" placeholder="PIN admina">
-    <button id="btnAdminLogin">Zaloguj</button>
+    <button id="btnAdminLogin" type="button">Zaloguj</button>
     <div id="adminPanel" style="display:none;margin-top:12px">
       <input id="taskIn" placeholder="Dodaj zadanie">
-      <button id="btnAddTask">Dodaj</button>
-      <button id="btnClearTasks">Wyczyść zadania</button>
+      <button id="btnAddTask" type="button">Dodaj</button>
+      <button id="btnClearTasks" type="button">Wyczyść zadania</button>
       <p id="taskCount"></p>
     </div>
   </div>
@@ -61,7 +61,7 @@ li{background:#222;margin:6px;padding:8px;}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-  // 🔹 Firebase config — podmień na swoje!
+  // 🔹 Firebase config – podmień na swoje!
   const firebaseConfig = {
     apiKey: "TU_API_KEY",
     authDomain: "TU_AUTH_DOMAIN",
@@ -79,7 +79,7 @@ li{background:#222;margin:6px;padding:8px;}
   let cells = [];
 
   // ---------- OBSŁUGA ZDARZEŃ ----------
-  window.onload = function() {
+  document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("tabBingo").addEventListener("click", ()=>switchTab('bingo'));
     document.getElementById("tabAdmin").addEventListener("click", ()=>switchTab('admin'));
     document.getElementById("tabRanking").addEventListener("click", ()=>switchTab('ranking'));
@@ -89,7 +89,7 @@ li{background:#222;margin:6px;padding:8px;}
     document.getElementById("btnAddTask").addEventListener("click", addTask);
     document.getElementById("btnClearTasks").addEventListener("click", clearAllTasks);
 
-    // Nasłuchiwanie live
+    // Live update
     db.ref('tasks').on('value', snapshot => {
       if(cells.length>0) loadTasks();
       updateTaskCount();
@@ -97,7 +97,7 @@ li{background:#222;margin:6px;padding:8px;}
     db.ref('ranking').on('value', snapshot => {
       renderRanking();
     });
-  }
+  });
 
   // ---------- SWITCH TAB ----------
   function switchTab(name){
