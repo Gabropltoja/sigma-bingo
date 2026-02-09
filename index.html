@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>SIGMA Bingo Online</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#111;color:#eee;text-align:center;}
+h1{margin-top:20px;letter-spacing:3px;}
+button{padding:10px 16px;margin:6px;background:#8e44ad;border:none;color:#fff;cursor:pointer;border-radius:4px;}
+input{padding:8px;border-radius:4px;border:none;width:240px;}
+table{margin:auto;border-collapse:collapse;}
+td{width:140px;height:90px;border:2px solid #444;cursor:pointer;padding:6px;}
+td.checked{background:#8e44ad;text-decoration:line-through;}
+#win{display:none;font-size:32px;color:#f39c12;margin:10px;}
+.panel{margin:12px auto;padding:12px;border:1px solid #333;border-radius:6px;width:85%;}
+ul{list-style:none;padding:0;}
+li{background:#222;margin:6px;padding:8px;}
+.tabs button.active {background:#2c3e50;}
+</style>
+</head>
+<body>
+
+<h1>🐺 SIGMA Bingo Online</h1>
+
+<div class="tabs">
+  <button class="active" onclick="switchTab('bingo')">Bingo</button>
+  <button onclick="switchTab('admin')">Admin</button>
+  <button onclick="switchTab('ranking')">Ranking</button>
+</div>
+
+<div id="bingoTab" class="tab section">
+  <div class="panel">
+    <input id="nick" placeholder="Twój nick">
+    <button onclick="startGame()">Start</button>
+    <div id="win">🏆 WYGRANA – 3 LINIE 🏆</div>
+    <table id="bingo"></table>
+  </div>
+</div>
+
+<div id="adminTab" class="tab section" style="display:none">
+  <div class="panel">
+    <input id="adminPin" type="password" placeholder="PIN admina">
+    <button onclick="loginAdmin()">Zaloguj</button>
+    <div id="adminPanel" style="display:none;">
+      <input id="taskIn" placeholder="Dodaj zadanie">
+      <button onclick="addTask()">Dodaj</button>
+      <button onclick="clearAllTasks()">Wyczyść zadania</button>
+      <p id="taskCount"></p>
+    </div>
+  </div>
+</div>
+
+<div id="rankingTab" class="tab section" style="display:none">
+  <div class="panel">
+    <h2>🏆 Ranking</h2>
+    <ul id="rankList"></ul>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+  // 🔹 PODMIENIĆ KONFIGURACJĘ FIREBASE NA SWOJĄ
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_AUTH_DOMAIN",
+    databaseURL: "TU_DATABASE_URL",
+    projectId: "TU_PROJECT_ID",
+    storageBucket: "TU_STORAGE_BUCKET",
+    messagingSenderId: "TU_MESSAGING_SENDER_ID",
+    appId: "TU_APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const ADMIN_PIN = "1413";
+  let isAdmin = false;
+
+  // ---------- NAV ----------
+  function switchTab(name){
+    document.querySelectorAll('.section').forEach(s=>s.style.display='none');
+    document.getElementById(name+'Tab').style.display='block';
+    document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+    event.target.classList.add('active');
+    if(name==='ranking') renderRanking();
+  }
+
+  // ---------- BINGO ----------
+  let cells = [];
+  function startGame(){
+    const nick = document.getElementById("nick").value.trim();
+    if(!nick) return alert("Podaj nick");
+    window.currentNick = nick;
+    loadTasks();
+  }
+
+  function loadTasks(){
+    db.ref('tasks').once('value', snap => {
+      const tasks = snap.val() || {};
+      const arr = Object.values(tasks);
+      if(arr.length < 25) return alert("Admin musi dodać min. 25 zadań");
+      bingoBoard(arr);
+    });
+  }
+
+  function bingoBoard(tasks){
+    shuffle(tasks);
+    const picked = tasks.slice(0,25);
+    cells = [];
+    document.getElementById("win").style.display="none";
+    const table = document.getElementById("bingo");
+    table.innerHTML = "";
+    let idx = 0;
+    for(let r=0; r<5; r++){
+      let tr = document.createElement("tr");
+      for(let c=0; c<5; c++){
+        let td = document.createElement("td");
+        td.textContent = picked[idx++];
+        td.onclick = () => { td.classList.toggle("checked"); checkWinOnline(); };
+        cells.push(td);
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+  }
+
+  function checkWinOnline(){
+    let wins = 0;
+    for(let r=0;r<5;r++) if([0,1,2,3,4].every(c=>cells[r*5+c].classList.contains("checked"))) wins++;
+    for(let c=0;c<5;c++) if([0,1,2,3,4].every(r=>cells[r*5+c].classList.contains("checked"))) wins++;
+    if([0,6,12,18,24].every(i=>cells[i].classList.contains("checked"))) wins++;
+    if([4,8,12,16,20].every(i=>cells[i].classList.contains("checked"))) wins++;
+    if(wins>=3){
+      document.getElementById("win").style.display="block";
+      addWinOnline();
+    }
+  }
+
+  function addWinOnline(){
+    const ref = db.ref('ranking/'+window.currentNick);
+    ref.transaction(score => (score||0) + 1);
+  }
+
+  function shuffle(a){a.sort(()=>Math.random()-0.5)}
+
+  // ---------- ADMIN ----------
+  function loginAdmin(){
+    if(document.getElementById("adminPin").value === ADMIN_PIN){
+      isAdmin = true;
+      document.getElementById("adminPanel").style.display="block";
+      updateTaskCount();
+    } else alert("Zły PIN");
+  }
+
+  function addTask(){
+    if(!isAdmin) return;
+    const txt = document.getElementById("taskIn").value.trim();
+    if(!txt) return;
+    const newKey = db.ref().child('tasks').push().key;
+    db.ref('tasks/'+newKey).set(txt);
+    document.getElementById("taskIn").value="";
+    updateTaskCount();
+  }
+
+  function clearAllTasks(){
+    if(!isAdmin) return;
+    if(confirm("Usunąć wszystkie zadania?")) db.ref('tasks').remove();
+    updateTaskCount();
+  }
+
+  function updateTaskCount(){
+    db.ref('tasks').once('value', snap=>{
+      const count = snap.exists()?Object.keys(snap.val()).length:0;
+      document.getElementById("taskCount").textContent="Liczba zadań: "+count;
+    });
+  }
+
+  // ---------- RANKING ----------
+  function renderRanking(){
+    const list = document.getElementById("rankList");
+    list.innerHTML="";
+    db.ref('ranking').once('value', snap => {
+      const data = snap.val()||{};
+      const entries = Object.entries(data).sort((a,b)=>b[1]-a[1]);
+      if(entries.length === 0) list.innerHTML="<li>Brak wyników</li>";
+      entries.forEach(([n,s],i)=>{
+        const li = document.createElement("li");
+        li.textContent = `${i+1}. ${n} — ${s} wygrane`;
+        list.appendChild(li);
+      });
+    });
+  }
+
+  // ---------- LIVE UPDATE ----------
+  // Nasłuchiwanie zmian w zadaniach i rankingach w czasie rzeczywistym
+  db.ref('tasks').on('value', snapshot => {
+    if(cells.length > 0) loadTasks();
+    updateTaskCount();
+  });
+  db.ref('ranking').on('value', snapshot => {
+    renderRanking();
+  });
+</script>
+</body>
+</html>
