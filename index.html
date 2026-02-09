@@ -23,9 +23,9 @@ li{background:#222;margin:6px;padding:8px;}
 <h1>🐺 SIGMA Bingo Online</h1>
 
 <div class="tabs">
-  <button class="active" onclick="switchTab('bingo')">Bingo</button>
-  <button onclick="switchTab('admin')">Admin</button>
-  <button onclick="switchTab('ranking')">Ranking</button>
+  <button onclick="switchTab('bingo', event)" class="active">Bingo</button>
+  <button onclick="switchTab('admin', event)">Admin</button>
+  <button onclick="switchTab('ranking', event)">Ranking</button>
 </div>
 
 <div id="bingoTab" class="tab section">
@@ -41,7 +41,7 @@ li{background:#222;margin:6px;padding:8px;}
   <div class="panel">
     <input id="adminPin" type="password" placeholder="PIN admina">
     <button onclick="loginAdmin()">Zaloguj</button>
-    <div id="adminPanel" style="display:none;">
+    <div id="adminPanel" style="display:none;margin-top:12px">
       <input id="taskIn" placeholder="Dodaj zadanie">
       <button onclick="addTask()">Dodaj</button>
       <button onclick="clearAllTasks()">Wyczyść zadania</button>
@@ -61,7 +61,7 @@ li{background:#222;margin:6px;padding:8px;}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-  // 🔹 PODMIENIĆ KONFIGURACJĘ FIREBASE NA SWOJĄ
+  // 🔹 Firebase config — podmień na swoje!
   const firebaseConfig = {
     apiKey: "TU_API_KEY",
     authDomain: "TU_AUTH_DOMAIN",
@@ -78,11 +78,11 @@ li{background:#222;margin:6px;padding:8px;}
   let isAdmin = false;
 
   // ---------- NAV ----------
-  function switchTab(name){
+  function switchTab(name, event){
     document.querySelectorAll('.section').forEach(s=>s.style.display='none');
     document.getElementById(name+'Tab').style.display='block';
     document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
-    event.target.classList.add('active');
+    if(event) event.target.classList.add('active');
     if(name==='ranking') renderRanking();
   }
 
@@ -90,7 +90,7 @@ li{background:#222;margin:6px;padding:8px;}
   let cells = [];
   function startGame(){
     const nick = document.getElementById("nick").value.trim();
-    if(!nick) return alert("Podaj nick");
+    if(!nick) { alert("Podaj nick!"); return; }
     window.currentNick = nick;
     loadTasks();
   }
@@ -99,7 +99,7 @@ li{background:#222;margin:6px;padding:8px;}
     db.ref('tasks').once('value', snap => {
       const tasks = snap.val() || {};
       const arr = Object.values(tasks);
-      if(arr.length < 25) return alert("Admin musi dodać min. 25 zadań");
+      if(arr.length < 25) { alert("Admin musi dodać min. 25 zadań"); return; }
       bingoBoard(arr);
     });
   }
@@ -112,9 +112,9 @@ li{background:#222;margin:6px;padding:8px;}
     const table = document.getElementById("bingo");
     table.innerHTML = "";
     let idx = 0;
-    for(let r=0; r<5; r++){
+    for(let r=0;r<5;r++){
       let tr = document.createElement("tr");
-      for(let c=0; c<5; c++){
+      for(let c=0;c<5;c++){
         let td = document.createElement("td");
         td.textContent = picked[idx++];
         td.onclick = () => { td.classList.toggle("checked"); checkWinOnline(); };
@@ -139,18 +139,19 @@ li{background:#222;margin:6px;padding:8px;}
 
   function addWinOnline(){
     const ref = db.ref('ranking/'+window.currentNick);
-    ref.transaction(score => (score||0) + 1);
+    ref.transaction(score => (score||0)+1);
   }
 
-  function shuffle(a){a.sort(()=>Math.random()-0.5)}
+  function shuffle(a){ a.sort(()=>Math.random()-0.5) }
 
   // ---------- ADMIN ----------
   function loginAdmin(){
-    if(document.getElementById("adminPin").value === ADMIN_PIN){
+    const pin = document.getElementById("adminPin").value.trim();
+    if(pin === ADMIN_PIN){
       isAdmin = true;
       document.getElementById("adminPanel").style.display="block";
       updateTaskCount();
-    } else alert("Zły PIN");
+    } else { alert("Zły PIN!"); }
   }
 
   function addTask(){
@@ -183,7 +184,7 @@ li{background:#222;margin:6px;padding:8px;}
     db.ref('ranking').once('value', snap => {
       const data = snap.val()||{};
       const entries = Object.entries(data).sort((a,b)=>b[1]-a[1]);
-      if(entries.length === 0) list.innerHTML="<li>Brak wyników</li>";
+      if(entries.length===0) list.innerHTML="<li>Brak wyników</li>";
       entries.forEach(([n,s],i)=>{
         const li = document.createElement("li");
         li.textContent = `${i+1}. ${n} — ${s} wygrane`;
@@ -193,7 +194,6 @@ li{background:#222;margin:6px;padding:8px;}
   }
 
   // ---------- LIVE UPDATE ----------
-  // Nasłuchiwanie zmian w zadaniach i rankingach w czasie rzeczywistym
   db.ref('tasks').on('value', snapshot => {
     if(cells.length > 0) loadTasks();
     updateTaskCount();
