@@ -4,18 +4,32 @@
 <meta charset="UTF-8">
 <title>SIGMA Bingo Online</title>
 <style>
-body{margin:0;font-family:Arial,sans-serif;background:#111;color:#eee;text-align:center;}
+body{margin:0;font-family:Arial,sans-serif;background:#111;color:#eee;text-align:center;position:relative;}
 h1{margin-top:20px;letter-spacing:3px;}
-button{padding:10px 16px;margin:6px;background:#8e44ad;border:none;color:#fff;cursor:pointer;border-radius:4px;}
-input{padding:8px;border-radius:4px;border:none;width:240px;}
-table{margin:auto;border-collapse:collapse;}
+button{
+  padding:6px 12px;
+  margin:4px;
+  background:#8e44ad;
+  border:none;
+  color:#fff;
+  cursor:pointer;
+  border-radius:12px;
+  font-size:14px;
+  min-width:80px;
+}
+.tabs{
+  position:absolute;
+  top:10px;
+  right:10px;
+  display:flex;
+  flex-direction:column;
+}
+table{margin:auto;border-collapse:collapse;margin-top:60px;}
 td{width:140px;height:90px;border:2px solid #444;cursor:pointer;padding:6px;}
 td.checked{background:#8e44ad;text-decoration:line-through;}
-#win{display:none;font-size:32px;color:#f39c12;margin:10px;}
+#win{display:none;font-size:28px;color:#f39c12;margin:10px;}
 .panel{margin:12px auto;padding:12px;border:1px solid #333;border-radius:6px;width:85%;}
-ul{list-style:none;padding:0;}
-li{background:#222;margin:6px;padding:8px;}
-.tabs button.active {background:#2c3e50;}
+input{padding:6px;border-radius:6px;border:none;width:220px;font-size:14px;}
 </style>
 </head>
 <body>
@@ -25,12 +39,10 @@ li{background:#222;margin:6px;padding:8px;}
 <div class="tabs">
   <button id="tabBingo">Bingo</button>
   <button id="tabAdmin">Admin</button>
-  <button id="tabRanking">Ranking</button>
 </div>
 
 <div id="bingoTab" class="tab section">
   <div class="panel">
-    <button id="btnStart" type="button">Start</button>
     <div id="win">🏆 WYGRANA – 3 LINIE 🏆</div>
     <table id="bingo"></table>
   </div>
@@ -49,82 +61,41 @@ li{background:#222;margin:6px;padding:8px;}
   </div>
 </div>
 
-<div id="rankingTab" class="tab section" style="display:none">
-  <div class="panel">
-    <h2>🏆 Ranking</h2>
-    <ul id="rankList"></ul>
-  </div>
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <script>
-try {
-  const firebaseConfig = {
-    apiKey: "TU_API_KEY",
-    authDomain: "TU_AUTH_DOMAIN",
-    databaseURL: "TU_DATABASE_URL",
-    projectId: "TU_PROJECT_ID",
-    storageBucket: "TU_STORAGE_BUCKET",
-    messagingSenderId: "TU_MESSAGING_SENDER_ID",
-    appId: "TU_APP_ID"
-  };
-  firebase.initializeApp(firebaseConfig);
-  var db = firebase.database();
-} catch(e) {
-  console.warn("Firebase nie został poprawnie skonfigurowany.", e);
-  var db = { ref: ()=>({ on:()=>{}, once:()=>({ val:()=>({}) }), set:()=>{}, push:()=>({ key:"test" }), remove:()=>{}, transaction:()=>{} }) };
-}
-
 const ADMIN_PIN = "1413";
 let isAdmin = false;
 let cells = [];
+let tasks = []; // lista zadań lokalnie
 
 // ---------- OBSŁUGA ZDARZEŃ ----------
 document.getElementById("tabBingo").addEventListener("click", ()=>switchTab('bingo'));
 document.getElementById("tabAdmin").addEventListener("click", ()=>switchTab('admin'));
-document.getElementById("tabRanking").addEventListener("click", ()=>switchTab('ranking'));
-document.getElementById("btnStart").addEventListener("click", startGame);
 document.getElementById("btnAdminLogin").addEventListener("click", loginAdmin);
 document.getElementById("btnAddTask").addEventListener("click", addTask);
 document.getElementById("btnClearTasks").addEventListener("click", clearAllTasks);
 
-try {
-  db.ref('tasks').on('value', snapshot => {
-    if(cells.length>0) loadTasks();
-    updateTaskCount();
-  });
-  db.ref('ranking').on('value', snapshot => {
-    renderRanking();
-  });
-} catch(e){ console.warn(e); }
-
 // ---------- SWITCH TAB ----------
 function switchTab(name){
-  document.querySelectorAll('.section').forEach(s=>s.style.display='none');
+  document.querySelectorAll('.tab.section').forEach(s=>s.style.display='none');
   document.getElementById(name+'Tab').style.display='block';
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
   document.getElementById("tab"+name.charAt(0).toUpperCase()+name.slice(1)).classList.add("active");
+
+  if(name==='bingo') loadTasks();
 }
 
 // ---------- BINGO ----------
-function startGame(){
-  loadTasks();
-}
-
 function loadTasks(){
-  db.ref('tasks').once('value', snap=>{
-    const tasks = snap.val() || {};
-    const arr = Object.values(tasks);
-    if(arr.length < 25){ alert("Admin musi dodać min. 25 zadań"); return; }
-    bingoBoard(arr);
-  });
+  if(tasks.length < 25){ 
+    document.getElementById("bingo").innerHTML="";
+    alert("Admin musi dodać min. 25 zadań"); 
+    return; 
+  }
+  bingoBoard(tasks);
 }
 
-function bingoBoard(tasks){
-  shuffle(tasks);
-  const picked = tasks.slice(0,25);
+function bingoBoard(taskArray){
+  const picked = [...taskArray].sort(()=>Math.random()-0.5).slice(0,25);
   cells = [];
   document.getElementById("win").style.display="none";
   const table = document.getElementById("bingo");
@@ -157,8 +128,6 @@ function checkWin(){
   }
 }
 
-function shuffle(a){ a.sort(()=>Math.random()-0.5); }
-
 // ---------- ADMIN ----------
 function loginAdmin(){
   const pin = document.getElementById("adminPin").value.trim();
@@ -176,10 +145,7 @@ function addTask(){
   if(!isAdmin) return;
   const txt = document.getElementById("taskIn").value.trim();
   if(!txt) return;
-  try {
-    const newKey = db.ref().child('tasks').push().key;
-    db.ref('tasks/'+newKey).set(txt);
-  } catch(e){ console.warn(e); }
+  tasks.push(txt);
   document.getElementById("taskIn").value="";
   updateTaskCount();
 }
@@ -187,36 +153,13 @@ function addTask(){
 function clearAllTasks(){
   if(!isAdmin) return;
   if(confirm("Usunąć wszystkie zadania?")){
-    try { db.ref('tasks').remove(); } catch(e){ console.warn(e); }
+    tasks = [];
   }
   updateTaskCount();
 }
 
 function updateTaskCount(){
-  try {
-    db.ref('tasks').once('value', snap=>{
-      const count = snap.exists()?Object.keys(snap.val()).length:0;
-      document.getElementById("taskCount").textContent="Liczba zadań: "+count;
-    });
-  } catch(e){ console.warn(e); }
-}
-
-// ---------- RANKING ----------
-function renderRanking(){
-  const list = document.getElementById("rankList");
-  list.innerHTML="";
-  try {
-    db.ref('ranking').once('value', snap=>{
-      const data = snap.val()||{};
-      const entries = Object.entries(data).sort((a,b)=>b[1]-a[1]);
-      if(entries.length===0) list.innerHTML="<li>Brak wyników</li>";
-      entries.forEach(([n,s],i)=>{
-        const li=document.createElement("li");
-        li.textContent=`${i+1}. ${n} — ${s} wygrane`;
-        list.appendChild(li);
-      });
-    });
-  } catch(e){ console.warn(e); list.innerHTML="<li>Brak wyników</li>"; }
+  document.getElementById("taskCount").textContent="Liczba zadań: "+tasks.length;
 }
 </script>
 </body>
